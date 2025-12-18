@@ -1,0 +1,58 @@
+{
+  "name": "devtracker",
+  "displayName": "DevTracker (Beta)",
+  "description": "Local-first developer activity tracker with diffs, history & revert. Beta version.",
+  "version": "0.9.0",
+  "publisher": "GenomorphPvtLtd",
+  "preview": true,
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:devtracker.showLocalSummary"
+  ],
+  "main": "./out/extension.js",
+  "files": [
+    "out",
+    "node_modules",
+    "package.json"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "devtracker.showLocalSummary",
+        "title": "DevTracker: Show Local Summary"
+      },
+      {
+        "command": "devtracker.openRecentDiff",
+        "title": "DevTracker: Open Diff From Recent Snapshot"
+      },
+      {
+        "command": "devtracker.openHistoryPanel",
+        "title": "DevTracker: Open History Panel"
+      },
+      {
+        "command": "devtracker.reportIssue",
+        "title": "DevTracker: Report Issue / Feedback"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "body-parser": "^2.2.1",
+    "express": "^5.2.1",
+    "sql.js": "^1.13.0"
+  }
+}
