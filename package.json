@@ -18,11 +18,12 @@
   ],
   "main": "./out/extension.js",
   "files": [
-    "out",
-    "node_modules",
-    "README.md",
-    "package.json"
-  ],
+  "out",
+  "node_modules",
+  "README.md",
+  "package.json",
+  "LICENSE"
+],
   "contributes": {
     "commands": [
       {
