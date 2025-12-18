@@ -8,6 +8,10 @@
   "engines": {
     "vscode": "^1.80.0"
   },
+  "repository": {
+  "type": "git",
+  "url": "https://github.com/Agent1092/devTracker.git"
+},
   "activationEvents": [
     "onStartupFinished",
     "onCommand:devtracker.showLocalSummary"
