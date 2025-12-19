@@ -1,8 +1,9 @@
 {
+  "icon": "logo.png",
   "name": "devtracker",
   "displayName": "DevTracker (Beta)",
   "description": "Local-first developer activity tracker with diffs, history & revert. Beta version.",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "publisher": "GenomorphPvtLtd",
   "preview": true,
   "engines": {

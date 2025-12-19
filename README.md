@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="icon.png" width="96" />
+</p>
+
+<h1 align="center">DevTracker</h1>
+<p align="center"><i>Local-first developer activity tracker</i></p>
+
+
 # DevTracker — Developer Update Tracker (Local-First)
 
 DevTracker is a **local-first VS Code extension** that helps you track your daily coding changes with:
