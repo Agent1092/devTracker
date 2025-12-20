@@ -1,66 +1,60 @@
 <p align="center">
-  <img src="icon.png" width="96" />
+  <img src="resources/logo.png" width="96" />
 </p>
 
 <h1 align="center">DevTracker</h1>
-<p align="center"><i>Local-first developer activity tracker</i></p>
-
-
-# DevTracker — Developer Update Tracker (Local-First)
-
-DevTracker is a **local-first VS Code extension** that helps you track your daily coding changes with:
-- **Instant diff viewer**
-- **Local history (up to 1 month)**
-- **Unlimited local summaries**
-
-✅ No heavy monitoring VMs  
-✅ No spyware  
-✅ No cloud required for Stage-1  
-✅ Designed for **individual developers** who want clean, fast, offline tracking
+<p align="center"><i>Local-first developer activity tracker for VS Code</i></p>
 
 ---
 
-## Features (Stage-1: Individual Developer Edition)
+## 🚀 DevTracker (Beta)
+
+DevTracker is a **local-first VS Code extension** that helps developers understand *what they actually worked on* — without cloud sync, spyware, or performance overhead.
+
+### Why DevTracker?
+- Developers lose track of daily changes
+- Existing tools rely on cloud monitoring or heavy agents
+- Offline workflows are ignored
+
+DevTracker fixes this.
+
+---
+
+## ✨ Features (v0.9.3 — Beta)
 
 - **Instant Diff Viewer**
-  - Quickly view changes captured by DevTracker snapshots
+  - View changes captured by DevTracker snapshots
 
-- **History (up to 1 month)**
-  - Maintains local change history for the last month
+- **Local History (up to 1 month)**
+  - Maintains lightweight local change history
 
-- **Unlimited Local Summary**
+- **Unlimited Local Summaries**
   - Generate summaries locally (no cloud dependency)
 
----
-
-## How it works
-
-DevTracker runs a **lightweight embedded local service** inside the extension for single-user usage.
-It stores data locally on your machine.
-
-> Team + Business workspace features will be introduced in future versions.
+✅ Local-first  
+✅ Works offline  
+✅ No background VMs  
+✅ No performance impact  
 
 ---
 
-## Installation
+## 🧠 How it works
 
-### From VS Code Marketplace
-(Coming soon — will add marketplace link after publishing)
+DevTracker runs a **lightweight embedded local service** inside the extension and stores all data **locally on your machine**.
 
-### From source (developer)
-1. Clone the repo
-2. Open the `vscode-extension/` folder in VS Code
-3. Install dependencies:
-   ```bash
-   npm install
+No data leaves your system.
 
+> Team and business workspace features will be introduced in future versions.
 
+---
 
-## License
+## 📦 Installation
 
-This project is licensed under the Polyform Noncommercial License.
+### VS Code Marketplace
+🔗 *(Link will be added after marketplace approval)*
 
-- Free for personal and internal developer use
-- Commercial use, resale, or SaaS offerings require a paid license
-
-For commercial licensing, contact: genomorphpvtltd@gmail.com
+### From source
+```bash
+git clone https://github.com/Agent1092/devTracker.git
+cd vscode-extension
+npm install

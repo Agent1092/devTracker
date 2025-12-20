@@ -3,26 +3,69 @@
   "name": "devtracker",
   "displayName": "DevTracker (Beta)",
   "description": "Local-first developer activity tracker with diffs, history & revert. Beta version.",
-  "version": "0.9.1",
+  "version": "0.9.4",
   "publisher": "GenomorphPvtLtd",
   "preview": true,
   "engines": {
     "vscode": "^1.80.0"
   },
   "repository": {
-  "type": "git",
-  "url": "https://github.com/Agent1092/devTracker.git"
-},
+    "type": "git",
+    "url": "https://github.com/Agent1092/devTracker.git"
+  },
+  
   "activationEvents": [
-    "onStartupFinished",
-    "onCommand:devtracker.showLocalSummary"
-  ],
+  "onStartupFinished",
+  "onView:devtracker.home",
+  "onCommand:devtracker.showLocalSummary",
+  "onCommand:devtracker.openHistoryPanel",
+  "onCommand:devtracker.openRecentDiff",
+  "onCommand:devtracker.reportIssue"
+]
+,
   "main": "./out/extension.js",
   "contributes": {
+
+    
+   "viewsContainers": {
+    "activitybar": [
+      {
+        "id": "devtracker",
+        "title": "DevTracker",
+        "icon": "resources/activitybar.png"
+      }
+    ]
+  },
+  "views": {
+    "devtracker": [
+    {
+      "type": "webview",
+      "id": "devtracker.home",
+      "name": "DevTracker",
+      "icon": "resources/activitybar.png"
+    }
+  ]
+  },
+    "keybindings": [
+      {
+        "command": "devtracker.openHistoryPanel",
+        "key": "ctrl+shift+h",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "devtracker.showLocalSummary",
+        "key": "ctrl+shift+g",
+        "when": "editorTextFocus"
+      }
+    ],
     "commands": [
       {
         "command": "devtracker.showLocalSummary",
         "title": "DevTracker: Show Local Summary"
+      },
+      {
+        "command": "devtracker.whatsNew",
+        "title": "DevTracker: What's New"
       },
       {
         "command": "devtracker.openRecentDiff",
