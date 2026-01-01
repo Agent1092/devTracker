@@ -1,64 +1,124 @@
 <p align="center">
-  <img src="logo.png" width="96" />
+  <img src="https://raw.githubusercontent.com/Agent1092/devTracker/main/logo.png" width="96" />
 </p>
 
 <h1 align="center">DevTracker</h1>
-<p align="center"><i>Local-first developer activity tracker for VS Code</i></p>
+<p align="center"><i>A local-first developer activity tracker for VS Code</i></p>
 
 ---
 
 ## 🚀 DevTracker (Beta)
 
-DevTracker is a **local-first VS Code extension** that helps developers understand *what they actually worked on* — without cloud sync, spyware, or performance overhead.
+DevTracker is a **local-first VS Code extension** that helps developers understand  
+**what they actually worked on** — without cloud sync, monitoring agents, or performance overhead.
 
-### Why DevTracker?
-- Developers lose track of daily changes
-- Existing tools rely on cloud monitoring or heavy agents
-- Offline workflows are ignored
-
-DevTracker fixes this.
+It runs quietly in the background and surfaces insights **when they matter**.
 
 ---
 
-## ✨ Features (v0.9.3 — Beta)
+## Why DevTracker?
 
-- **Instant Diff Viewer**
-  - View changes captured by DevTracker snapshots
+Most developers ask questions like:
+- *“What did I work on yesterday?”*
+- *“Which files did I touch the most?”*
+- *“What changed before I broke this?”*
 
-- **Local History (up to 1 month)**
-  - Maintains lightweight local change history
+But existing tools are either:
+- Cloud-heavy  
+- Focused on teams instead of individuals  
+- Or too intrusive for daily use  
 
-- **Unlimited Local Summaries**
-  - Generate summaries locally (no cloud dependency)
+DevTracker is built for **individual developers** who value:
+- clarity
+- privacy
+- offline workflows
 
-✅ Local-first  
-✅ Works offline  
-✅ No background VMs  
-✅ No performance impact  
+---
+
+## ✨ Features (v0.9.5 — Beta)
+
+### 🔔 Startup Session Summary
+- Automatically shows a popup on VS Code startup
+- Summarizes **what you worked on in your last session**
+- Helps you instantly regain context after a break
+
+---
+
+### 🗂️ Local History Panel
+- View up to **1 month of local change history**
+- Organized in a **collapsible folder & file tree**
+- Easily see where your effort went
+
+---
+
+### 🔍 Instant Diff Viewer
+- Open diffs from any tracked snapshot
+- Compare current code with previous states
+- Navigate changes quickly inside VS Code
+
+---
+
+### ↩️ Bulk Revert (Folder-based)
+- Undo all changes from your **last session** for a folder
+- One confirmation, fully local, undoable
+- No guessing which files to revert
+
+---
+
+### 📊 Local Summaries
+- Generate summaries of files touched per day
+- Runs completely offline
+- No data leaves your machine
+
+---
+
+### 🟢 Core Principles
+- ✅ Local-first
+- ✅ Works offline
+- ✅ No background VMs
+- ✅ No cloud sync
+- ✅ No performance impact
+- ✅ Undo-friendly (Ctrl+Z still works)
 
 ---
 
 ## 🧠 How it works
 
-DevTracker runs a **lightweight embedded local service** inside the extension and stores all data **locally on your machine**.
+DevTracker runs a **lightweight embedded local service** inside the VS Code extension.
 
-No data leaves your system.
+- File changes are snapshotted locally
+- Data is stored on your machine
+- Processing happens only when needed
 
-> Team and business workspace features will be introduced in future versions.
+**Nothing is uploaded. Nothing is tracked remotely.**
 
-## Screenshots
+---
+
+## 🔮 What’s coming next
+
+DevTracker is still in beta. Upcoming improvements include:
+- Weekly and monthly work insights
+- Smarter summaries across longer time ranges
+- Improved global history views
+- More context-aware notifications
+
+All future features will continue to respect the **local-first, privacy-first** philosophy.
+
+---
+
+## 📸 Screenshots
 
 ### Activity Bar Home
-![Home](./screenshots/sidebar.png)
+![Home](https://raw.githubusercontent.com/Agent1092/devTracker/main/screenshots/sidebar.png)
 
 ### Activity Bar Home
-![History](./screenshots/history.png)
+![History](https://raw.githubusercontent.com/Agent1092/devTracker/main/screenshots/history.png)
 
 ### Diff Viewer
-![Diff](./screenshots/quick%20latest%20diff.png)
+![Diff](https://raw.githubusercontent.com/Agent1092/devTracker/main/screenshots/quick%20latest%20diff.png)
 
 ### Local Summary
-![Summary](./screenshots/local%20summary.png)
+![Summary](https://raw.githubusercontent.com/Agent1092/devTracker/main/screenshots/local%20summary.png)
 
 ---
 
@@ -67,20 +127,28 @@ No data leaves your system.
 ### VS Code Marketplace
 🔗 *(Link will be added after marketplace approval)*
 
-## Who is this for?
+---
+
+## Who is DevTracker for?
 - Individual developers
 - Privacy-conscious engineers
-- Offline / low-distraction workflows
-- People who want daily/weekly work summaries
+- Offline or low-distraction workflows
+- Anyone who wants **daily clarity** without overhead
+
+---
 
 ## What DevTracker is NOT
 - ❌ Employee monitoring
-- ❌ Time tracking spyware
+- ❌ Time-tracking spyware
 - ❌ Cloud-first analytics
+- ❌ Productivity surveillance
 
+---
 
-### From source
+## From source
+
 ```bash
 git clone https://github.com/Agent1092/devTracker.git
 cd vscode-extension
 npm install
+npm run compile
