@@ -35,7 +35,7 @@ DevTracker is built for **individual developers** who value:
 
 ---
 
-## ✨ Features (v0.9.5 — Beta)
+## ✨ Features (v0.9.7 — Beta)
 
 ### 🔔 Startup Session Summary
 - Automatically shows a popup on VS Code startup
