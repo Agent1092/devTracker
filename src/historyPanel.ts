@@ -1,45 +1,13 @@
+// src/historyPanel.ts
 import * as vscode from "vscode";
 import { getLatestSnapshots, getSnapshot } from "./apiClient";
+import { runBulkRevertForFolder } from "./bulkRevert";
 
 type SnapshotSummary = {
   id: number;
   file_path: string;
   created_at: string;
 };
-
-type WebFileGroup = {
-  filePath: string;
-  fileName: string;
-  relPath: string;
-  versions: { id: number; time: string; created_at: string }[];
-  lastAtIso: string;
-  count: number;
-};
-
-type WebDay = {
-  isoDate: string; // YYYY-MM-DD
-  label: string; // e.g. Thu 14 Dec
-  count: number; // total snapshots that day
-};
-
-function toIsoDay(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
 
 export class HistoryPanel {
   private panel: vscode.WebviewPanel | undefined;
@@ -79,14 +47,23 @@ export class HistoryPanel {
           return;
         }
 
+        if (msg?.type === "bulkRevertFolder") {
+          const folderRel = String(msg.folderRel ?? ""); // "" == workspace root
+          await runBulkRevertForFolder({
+            ctx: this.context,
+            installationId: this.installationId,
+            folderRel,
+          });
+          await this.refresh();
+          return;
+        }
+
         if (msg?.type === "refresh") {
           await this.refresh();
           return;
         }
       } catch (err: any) {
-        vscode.window.showErrorMessage(
-          `DevTracker: action failed: ${err?.message ?? err}`
-        );
+        vscode.window.showErrorMessage(`DevTracker: action failed: ${err?.message ?? err}`);
       }
     });
 
@@ -94,13 +71,16 @@ export class HistoryPanel {
     await this.refresh();
   }
 
-  private prettifyPath(p: string) {
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (wsRoot && p.startsWith(wsRoot)) {
-      const rel = p.slice(wsRoot.length).replace(/^\/+/, "");
-      return rel.length ? rel : p;
+  private wsRoot(): string | null {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
+  }
+
+  private prettifyAbsToRel(pAbs: string) {
+    const root = this.wsRoot();
+    if (root && pAbs.startsWith(root)) {
+      return pAbs.slice(root.length).replace(/^[/\\]+/, "");
     }
-    return p;
+    return pAbs;
   }
 
   private async refresh() {
@@ -108,8 +88,7 @@ export class HistoryPanel {
 
     let snaps: SnapshotSummary[] = [];
     try {
-      // Fetch recent snapshots
-      snaps = await getLatestSnapshots(this.installationId, 200);
+      snaps = await getLatestSnapshots(this.installationId, 400);
     } catch (err: any) {
       this.panel.webview.postMessage({
         type: "error",
@@ -118,66 +97,39 @@ export class HistoryPanel {
       return;
     }
 
-    // Build day counts (for Month view)
-    const dayCounts = new Map<string, number>();
-    for (const s of snaps) {
-      const d = new Date(s.created_at);
-      const iso = toIsoDay(d);
-      dayCounts.set(iso, (dayCounts.get(iso) ?? 0) + 1);
-    }
-
-    // Build last 31 days list (even if no activity)
-    const today = startOfDay(new Date());
-    const days: WebDay[] = [];
-    for (let i = 0; i < 31; i++) {
-      const day = addDays(today, -i);
-      const iso = toIsoDay(day);
-      const label = day.toLocaleDateString(undefined, {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-      });
-      days.push({ isoDate: iso, label, count: dayCounts.get(iso) ?? 0 });
-    }
+    const wsRoot = this.wsRoot();
+    const wsName = vscode.workspace.workspaceFolders?.[0]?.name ?? "Workspace";
 
     this.panel.webview.postMessage({
       type: "data",
-      payload: { snaps, days },
+      payload: { snaps, wsRoot, wsName },
     });
   }
 
-  private async openDiff(snapshotId: number, filePath: string) {
+  private async openDiff(snapshotId: number, filePathAbs: string) {
     const leftUri = vscode.Uri.parse(`devtracker-snapshot:/${snapshotId}`);
-    const rightUri = vscode.Uri.file(filePath);
-
+    const rightUri = vscode.Uri.file(filePathAbs);
     await vscode.commands.executeCommand(
       "vscode.diff",
       leftUri,
       rightUri,
-      `DevTracker Diff: ${this.prettifyPath(filePath)}`
+      `DevTracker Diff: ${this.prettifyAbsToRel(filePathAbs)}`
     );
-
     try {
-      await vscode.commands.executeCommand(
-        "workbench.action.compareEditor.nextChange"
-      );
-    } catch {
-      // ignore
-    }
+      await vscode.commands.executeCommand("workbench.action.compareEditor.nextChange");
+    } catch {}
   }
 
-  private async revertToSnapshot(snapshotId: number, filePath: string) {
+  private async revertToSnapshot(snapshotId: number, filePathAbs: string) {
     const ok = await vscode.window.showWarningMessage(
-      `Revert "${this.prettifyPath(filePath)}" to snapshot #${snapshotId}?\n\nTip: You can undo with Ctrl+Z.`,
+      `Revert "${this.prettifyAbsToRel(filePathAbs)}" to snapshot #${snapshotId}?\n\nTip: You can undo with Ctrl+Z.`,
       { modal: true },
       "Revert"
     );
     if (ok !== "Revert") return;
 
     const snap = await getSnapshot(snapshotId);
-    const snapshotText = snap.full_text;
-
-    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePathAbs));
     const editor = await vscode.window.showTextDocument(doc, { preview: false });
 
     const fullRange = new vscode.Range(
@@ -185,248 +137,69 @@ export class HistoryPanel {
       doc.positionAt(doc.getText().length)
     );
 
-    await editor.edit((editBuilder) => {
-      editBuilder.replace(fullRange, snapshotText);
-    });
-
+    await editor.edit((eb) => eb.replace(fullRange, snap.full_text ?? ""));
     vscode.window.showInformationMessage("DevTracker: Reverted (Ctrl+Z to undo).");
   }
 
   private html(webview: vscode.Webview) {
     const nonce = String(Date.now());
-
     return /* html */ `
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DevTracker — History</title>
-  <style>
-    :root {
-      --bg: var(--vscode-editor-background);
-      --fg: var(--vscode-foreground);
-      --muted: var(--vscode-descriptionForeground);
-      --border: var(--vscode-panel-border);
-      --accent: var(--vscode-button-background);
-      --accentFg: var(--vscode-button-foreground);
-      --inputBg: var(--vscode-input-background);
-      --inputFg: var(--vscode-input-foreground);
-      --listHover: var(--vscode-list-hoverBackground);
-      --listActive: var(--vscode-list-activeSelectionBackground);
-      --listActiveFg: var(--vscode-list-activeSelectionForeground);
-    }
-
-    body {
-      margin: 0;
-      padding: 12px;
-      background: var(--bg);
-      color: var(--fg);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
-    }
-
-    .errBox {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px;
-      color: var(--muted);
-      margin-bottom: 12px;
-      display: none;
-    }
-
-    .top {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .localRow {
-      margin: -4px 0 10px;
-      color: var(--muted);
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .modeBadge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--inputBg);
-      color: var(--muted);
-      font-weight: 800;
-      font-size: 12px;
-    }
-
-    .dotLocal {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--accent);
-      opacity: 0.8;
-      display: inline-block;
-    }
-
-    .search {
-      flex: 1;
-      padding: 8px 10px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--inputBg);
-      color: var(--inputFg);
-      outline: none;
-    }
-
-    .btn {
-      padding: 8px 12px;
-      border: 0;
-      border-radius: 10px;
-      cursor: pointer;
-      background: var(--accent);
-      color: var(--accentFg);
-      font-weight: 800;
-    }
-
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .tab {
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--fg);
-      padding: 6px 10px;
-      border-radius: 999px;
-      cursor: pointer;
-      font-weight: 800;
-      font-size: 12px;
-    }
-    .tab.active { background: var(--listActive); color: var(--listActiveFg); border-color: transparent; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 320px 1fr;
-      gap: 12px;
-      height: calc(100vh - 120px);
-    }
-
-    .card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .cardHeader {
-      padding: 10px 12px;
-      font-weight: 900;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .sub {
-      font-weight: 700;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .list {
-      overflow: auto;
-      padding: 6px;
-      min-height: 0;
-    }
-
-    .item {
-      padding: 10px 10px;
-      border-radius: 12px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .item:hover { background: var(--listHover); }
-    .item.active { background: var(--listActive); color: var(--listActiveFg); }
-
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-
-    .fileName { font-weight: 900; }
-    .path {
-      font-size: 12px;
-      color: var(--muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .pill {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-weight: 900;
-    }
-
-    .time {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    .actions { display: flex; gap: 8px; align-items: center; }
-    .mini {
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--fg);
-      padding: 4px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: 900;
-      font-size: 12px;
-    }
-    .mini:hover { background: var(--listHover); }
-    .mini.danger { color: #ff6b6b; }
-
-    .dayDot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      display: inline-block;
-      margin-right: 8px;
-      background: transparent;
-    }
-    .dot0 { opacity: 0.25; }
-    .dot1 { opacity: 0.55; }
-    .dot2 { opacity: 0.75; }
-    .dot3 { opacity: 1.0; background: var(--accent); border-color: transparent; }
-
-    .empty { padding: 16px; color: var(--muted); }
-  </style>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root{
+    --bg: var(--vscode-editor-background);
+    --fg: var(--vscode-foreground);
+    --muted: var(--vscode-descriptionForeground);
+    --border: var(--vscode-panel-border);
+    --accent: var(--vscode-button-background);
+    --accentFg: var(--vscode-button-foreground);
+    --inputBg: var(--vscode-input-background);
+    --inputFg: var(--vscode-input-foreground);
+    --hover: var(--vscode-list-hoverBackground);
+    --active: var(--vscode-list-activeSelectionBackground);
+    --activeFg: var(--vscode-list-activeSelectionForeground);
+  }
+  body{ margin:0; padding:12px; background:var(--bg); color:var(--fg); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; }
+  .top{ display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+  .search{ flex:1; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--inputBg); color:var(--inputFg); outline:none; }
+  .btn{ padding:8px 12px; border:0; border-radius:10px; cursor:pointer; background:var(--accent); color:var(--accentFg); font-weight:900; }
+  .badge{ font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font-weight:900; }
+  .tabs{ display:flex; gap:8px; margin-bottom:12px; }
+  .tab{ border:1px solid var(--border); background:transparent; color:var(--fg); padding:6px 10px; border-radius:999px; cursor:pointer; font-weight:900; font-size:12px; }
+  .tab.active{ background:var(--active); color:var(--activeFg); border-color:transparent; }
+  .grid{ display:grid; grid-template-columns: 360px 1fr; gap:12px; height: calc(100vh - 92px); }
+  .card{ border:1px solid var(--border); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .header{ padding:10px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; font-weight:900; }
+  .sub{ font-weight:700; font-size:12px; color:var(--muted); }
+  .list{ overflow:auto; padding:6px; min-height:0; }
+  .rowItem{ padding:8px 10px; border-radius:10px; cursor:pointer; user-select:none; }
+  .rowItem:hover{ background:var(--hover); }
+  .rowItem.active{ background:var(--active); color:var(--activeFg); }
+  .treeRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .left{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .caret{ width:16px; text-align:center; opacity:.9; }
+  .name{ font-weight:900; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .path{ font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .indent{ margin-left:18px; }
+  .mini{ border:1px solid var(--border); background:transparent; color:var(--fg); padding:4px 10px; border-radius:10px; cursor:pointer; font-weight:900; font-size:12px; }
+  .mini:hover{ background:var(--hover); }
+  .mini.danger{ color:#ff6b6b; }
+  .mini:disabled{ opacity:.45; cursor:not-allowed; }
+  .empty{ padding:14px; color:var(--muted); }
+  .err{ display:none; border:1px solid var(--border); border-radius:14px; padding:12px; margin-bottom:12px; color:var(--muted); }
+</style>
 </head>
-
 <body>
-  <div id="err" class="errBox"></div>
+  <div id="err" class="err"></div>
 
   <div class="top">
-    <input id="search" class="search" placeholder="Search file (name or path)..." />
+    <input id="search" class="search" placeholder="Search file/folder..." />
     <button id="refresh" class="btn">Refresh</button>
-  </div>
-
-  <div class="localRow">
-    <div class="modeBadge"><span class="dotLocal"></span>Local mode: data stays on this machine (no cloud)</div>
   </div>
 
   <div class="tabs">
@@ -437,294 +210,374 @@ export class HistoryPanel {
 
   <div class="grid">
     <div class="card">
-      <div class="cardHeader">
-        <div id="leftTitle">Files</div>
-        <div class="sub" id="leftSub"></div>
+      <div class="header">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div>Explorer</div>
+          <div class="sub" id="leftSub"></div>
+        </div>
       </div>
       <div class="list" id="leftList"></div>
     </div>
 
     <div class="card">
-      <div class="cardHeader">
-        <div>Snapshots</div>
-        <div class="sub" id="rightSub"></div>
+      <div class="header">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div>Snapshots</div>
+          <div class="sub" id="rightSub"></div>
+        </div>
+        <button id="bulkBtn" class="mini danger" disabled>Bulk Revert</button>
       </div>
       <div class="list" id="rightList"></div>
     </div>
   </div>
 
-  <script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
+<script nonce="${nonce}">
+  const vscode = acquireVsCodeApi();
 
-    let rawSnaps = [];
-    let days = [];
-    let mode = "today";          // today | week | month
-    let selectedDay = null;      // YYYY-MM-DD for month mode
-    let fileGroups = [];         // computed groups
-    let filtered = [];           // after search
-    let selectedFileIndex = 0;
+  let snaps = [];
+  let wsRoot = null;
+  let wsName = "Workspace";
+  let mode = "today";
+  let selectedFileAbs = null;
+  let selectedFolderRel = null; // "" for root
+  const expanded = new Set();   // folderRel strings, "" root always expanded
 
-    const err = document.getElementById("err");
+  const err = document.getElementById("err");
+  const leftSub = document.getElementById("leftSub");
+  const leftList = document.getElementById("leftList");
 
-    const leftTitle = document.getElementById("leftTitle");
-    const leftSub = document.getElementById("leftSub");
-    const leftList = document.getElementById("leftList");
+  const rightSub = document.getElementById("rightSub");
+  const rightList = document.getElementById("rightList");
+  const bulkBtn = document.getElementById("bulkBtn");
 
-    const rightSub = document.getElementById("rightSub");
-    const rightList = document.getElementById("rightList");
+  document.getElementById("refresh").onclick = () => vscode.postMessage({ type:"refresh" });
+  document.getElementById("search").oninput = () => computeAndRender();
 
-    const search = document.getElementById("search");
-    const refreshBtn = document.getElementById("refresh");
-
-    document.querySelectorAll(".tab").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        mode = btn.dataset.mode;
-        selectedDay = null;
-        selectedFileIndex = 0;
-        computeAndRender();
-      });
-    });
-
-    refreshBtn.addEventListener("click", () => vscode.postMessage({ type: "refresh" }));
-
-    search.addEventListener("input", () => {
-      selectedFileIndex = 0;
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      mode = btn.dataset.mode;
+      selectedFileAbs = null;
+      selectedFolderRel = null;
       computeAndRender();
+    };
+  });
+
+  bulkBtn.onclick = () => {
+    if (bulkBtn.disabled) return;
+    vscode.postMessage({ type:"bulkRevertFolder", folderRel: selectedFolderRel ?? "" });
+  };
+
+  window.addEventListener("message", (event) => {
+    const msg = event.data;
+    if (msg.type === "error") {
+      err.style.display = "block";
+      err.textContent = msg.message || "Unknown error";
+      return;
+    }
+    if (msg.type === "data") {
+      err.style.display = "none";
+      err.textContent = "";
+      snaps = msg.payload?.snaps || [];
+      wsRoot = msg.payload?.wsRoot || null;
+      wsName = msg.payload?.wsName || "Workspace";
+
+      expanded.add(""); // root expanded always
+      computeAndRender();
+    }
+  });
+
+  function normalize(p){ return String(p||"").replace(/\\\\/g,"/"); }
+
+  function isUnderWorkspace(abs){
+    if (!wsRoot) return false;
+    const a = normalize(abs);
+    const r = normalize(wsRoot).replace(/\\/+$/,"");
+    return a === r || a.startsWith(r + "/");
+  }
+
+  function relFromAbs(abs){
+    const a = normalize(abs);
+    const r = normalize(wsRoot).replace(/\\/+$/,"");
+    if (a.startsWith(r + "/")) return a.slice(r.length + 1);
+    if (a === r) return "";
+    return a;
+  }
+
+  function fileName(rel){ return rel.split("/").pop() || rel; }
+
+  function startOfDay(d){
+    const x = new Date(d);
+    x.setHours(0,0,0,0);
+    return x;
+  }
+
+  function range() {
+    const now = new Date();
+    const start = startOfDay(now);
+    if (mode === "today") {
+      const end = new Date(start); end.setDate(end.getDate()+1);
+      return { start, end };
+    }
+    if (mode === "week") {
+      const s = new Date(start); s.setDate(s.getDate()-6);
+      const e = new Date(start); e.setDate(e.getDate()+1);
+      return { start:s, end:e };
+    }
+    const s = new Date(start); s.setDate(s.getDate()-29);
+    const e = new Date(start); e.setDate(e.getDate()+1);
+    return { start:s, end:e };
+  }
+
+  function fmt(iso){
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      weekday:"short", day:"2-digit", month:"short", year:"numeric",
+      hour:"2-digit", minute:"2-digit", second:"2-digit"
+    });
+  }
+
+  function groupByFile(snapsInRange){
+    const by = new Map();
+    snapsInRange.forEach(s => {
+      const arr = by.get(s.file_path) || [];
+      arr.push(s);
+      by.set(s.file_path, arr);
     });
 
-    window.addEventListener("message", (event) => {
-      const msg = event.data;
+    const out = [];
+    for (const [abs, arr] of by.entries()){
+      arr.sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
+      const rel = relFromAbs(abs);
+      out.push({
+        abs,
+        rel,
+        name: fileName(rel),
+        count: arr.length,
+        lastAt: arr[0].created_at,
+        versions: arr.map(v => ({ id:v.id, created_at:v.created_at, time: fmt(v.created_at) }))
+      });
+    }
+    out.sort((a,b)=> new Date(b.lastAt)-new Date(a.lastAt));
+    return out;
+  }
 
-      if (msg.type === "error") {
-        err.style.display = "block";
-        err.textContent = msg.message || "Unknown error";
-        return;
+  function folderRelOf(rel){
+    const parts = normalize(rel).split("/").filter(Boolean);
+    if (parts.length <= 1) return "";
+    return parts.slice(0, parts.length-1).join("/");
+  }
+
+  function buildTree(groups){
+    const root = { fullRel:"", folders:new Map(), files:[] };
+
+    function ensure(node, folderRel){
+      if (!folderRel) return node;
+      const parts = folderRel.split("/").filter(Boolean);
+      let cur = node;
+      let accum = "";
+      for (const p of parts){
+        accum = accum ? (accum + "/" + p) : p;
+        if (!cur.folders.has(p)){
+          cur.folders.set(p, { fullRel: accum, folders:new Map(), files:[] });
+        }
+        cur = cur.folders.get(p);
       }
+      return cur;
+    }
 
-      if (msg.type === "data") {
-        err.style.display = "none";
-        err.textContent = "";
+    for (const g of groups){
+      const folder = folderRelOf(g.rel);
+      const node = ensure(root, folder);
+      node.files.push(g);
+    }
+    return root;
+  }
 
-        rawSnaps = (msg.payload?.snaps || []);
-        days = (msg.payload?.days || []);
+  function matchesQ(group, q){
+    if (!q) return true;
+    const s = q.toLowerCase();
+    return (group.name||"").toLowerCase().includes(s) || (group.rel||"").toLowerCase().includes(s);
+  }
 
-        // quick sanity log (view it in Webview DevTools)
-        console.log("[DevTracker] snaps:", rawSnaps.length, "days:", days.length);
+  function countSnapshots(node){
+    let total = 0;
+    node.files.forEach(f => total += f.count);
+    for (const child of node.folders.values()){
+      total += countSnapshots(child);
+    }
+    return total;
+  }
 
-        selectedFileIndex = 0;
+  function computeAndRender(){
+    if (!wsRoot){
+      leftList.innerHTML = '<div class="empty">Open a folder workspace to see history.</div>';
+      rightList.innerHTML = '<div class="empty">No workspace open.</div>';
+      return;
+    }
+
+    // ✅ Filter to workspace files only
+    const workspaceSnaps = snaps.filter(s => isUnderWorkspace(s.file_path));
+
+    const { start, end } = range();
+    const snapsInRange = workspaceSnaps.filter(s => {
+      const t = new Date(s.created_at);
+      return t >= start && t < end;
+    });
+
+    const groups = groupByFile(snapsInRange);
+
+    const q = document.getElementById("search").value.trim();
+    const filtered = q ? groups.filter(g => matchesQ(g,q)) : groups;
+
+    leftSub.textContent = filtered.length ? \`\${filtered.length} files\` : "";
+
+    // selection cleanup
+    if (selectedFileAbs && !filtered.some(g => g.abs === selectedFileAbs)) {
+      selectedFileAbs = null;
+    }
+
+    const tree = buildTree(filtered);
+
+    renderTree(tree);
+    renderRight(filtered);
+    syncBulk();
+  }
+
+  function syncBulk(){
+    bulkBtn.disabled = (selectedFolderRel === null);
+    bulkBtn.title = bulkBtn.disabled ? "Select a folder in explorer to enable" : \`Bulk revert "\${selectedFolderRel || wsName}"\`;
+  }
+
+  function renderTree(tree){
+    leftList.innerHTML = "";
+    if (countSnapshots(tree) === 0){
+      leftList.innerHTML = '<div class="empty">No activity in this range.</div>';
+      return;
+    }
+
+    renderFolder(tree, "", 0, true);
+  }
+
+  function renderFolder(node, folderRel, depth, isRoot=false){
+    const label = isRoot ? wsName : folderRel.split("/").pop();
+    const hasChildren = node.folders.size > 0 || node.files.length > 0;
+
+    if (isRoot) expanded.add("");
+
+    const isOpen = expanded.has(folderRel);
+    const active = selectedFolderRel === folderRel && !selectedFileAbs;
+
+    const el = document.createElement("div");
+    el.className = "rowItem" + (active ? " active" : "");
+    el.innerHTML = \`
+      <div class="treeRow" style="margin-left:\${depth*18}px;">
+        <div class="left">
+          <span class="caret">\${hasChildren ? (isOpen ? "▾" : "▸") : "•"}</span>
+          <span class="name">📁 \${label}</span>
+        </div>
+        <span class="badge">\${countSnapshots(node)}</span>
+      </div>
+      <div class="path">\${isRoot ? wsRoot : folderRel}</div>
+    \`;
+
+    // caret toggles, row selects folder
+    el.onclick = () => {
+      selectedFolderRel = folderRel;
+      selectedFileAbs = null;
+      if (hasChildren){
+        if (expanded.has(folderRel)) expanded.delete(folderRel);
+        else expanded.add(folderRel);
+      }
+      computeAndRender();
+    };
+
+    leftList.appendChild(el);
+
+    if (!expanded.has(folderRel)) return;
+
+    // folders
+    const kids = Array.from(node.folders.entries())
+      .map(([name, child]) => ({ name, child }))
+      .sort((a,b)=> a.name.localeCompare(b.name));
+
+    for (const k of kids){
+      renderFolder(k.child, k.child.fullRel, depth+1, false);
+    }
+
+    // files
+    const files = node.files.slice().sort((a,b)=> new Date(b.lastAt)-new Date(a.lastAt));
+    for (const f of files){
+      const fe = document.createElement("div");
+      const fActive = selectedFileAbs === f.abs;
+      fe.className = "rowItem" + (fActive ? " active" : "");
+      fe.innerHTML = \`
+        <div class="treeRow" style="margin-left:\${(depth+1)*18}px;">
+          <div class="left">
+            <span class="caret"></span>
+            <span class="name">📄 \${f.name}</span>
+          </div>
+          <span class="badge">\${f.count}</span>
+        </div>
+        <div class="path">\${f.rel}</div>
+      \`;
+      fe.onclick = (ev) => {
+        ev.stopPropagation();
+        selectedFileAbs = f.abs;
+        selectedFolderRel = folderRel; // keep folder context for bulk revert
         computeAndRender();
-      }
+      };
+      leftList.appendChild(fe);
+    }
+  }
+
+  function renderRight(groups){
+    rightList.innerHTML = "";
+
+    const sel = selectedFileAbs ? groups.find(g => g.abs === selectedFileAbs) : null;
+
+    if (!sel){
+      rightSub.textContent = selectedFolderRel === null ? "Select a file to view snapshots." : \`Folder: \${selectedFolderRel || wsName}\`;
+      rightList.innerHTML = '<div class="empty">Click a file to see Diff/Revert. Select a folder then use Bulk Revert.</div>';
+      return;
+    }
+
+    rightSub.textContent = sel.rel;
+
+    sel.versions.forEach(v => {
+      const row = document.createElement("div");
+      row.className = "rowItem";
+      row.innerHTML = \`
+        <div class="treeRow">
+          <div class="left">
+            <span class="name" style="font-weight:700;">\${v.time}</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="mini" data-act="diff">Diff</button>
+            <button class="mini danger" data-act="revert">Revert</button>
+          </div>
+        </div>
+        <div class="path">Snapshot #\${v.id}</div>
+      \`;
+
+      row.onclick = () => vscode.postMessage({ type:"openDiff", snapshotId: v.id, filePath: sel.abs });
+
+      row.querySelector('[data-act="diff"]').onclick = (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ type:"openDiff", snapshotId: v.id, filePath: sel.abs });
+      };
+      row.querySelector('[data-act="revert"]').onclick = (e) => {
+        e.stopPropagation();
+        vscode.postMessage({ type:"revert", snapshotId: v.id, filePath: sel.abs, snapshotIdNum: v.id });
+      };
+
+      rightList.appendChild(row);
     });
+  }
 
-    function fmt(iso) {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    }
-
-    function computeRangeFilter() {
-      const now = new Date();
-      const start = new Date(now);
-      start.setHours(0,0,0,0);
-
-      if (mode === "today") {
-        const end = new Date(start);
-        end.setDate(end.getDate()+1);
-        return { start, end };
-      }
-
-      if (mode === "week") {
-        start.setDate(start.getDate()-6);
-        const end = new Date();
-        end.setDate(end.getDate()+1);
-        end.setHours(0,0,0,0);
-        return { start, end };
-      }
-
-      if (selectedDay) {
-        const s = new Date(selectedDay + "T00:00:00");
-        const e = new Date(s);
-        e.setDate(e.getDate()+1);
-        return { start: s, end: e };
-      }
-
-      const s = new Date();
-      s.setHours(0,0,0,0);
-      s.setDate(s.getDate()-30);
-      const e = new Date();
-      e.setDate(e.getDate()+1);
-      e.setHours(0,0,0,0);
-      return { start: s, end: e };
-    }
-
-    function groupByFile(snaps) {
-      const by = new Map();
-      snaps.forEach(s => {
-        const arr = by.get(s.file_path) || [];
-        arr.push(s);
-        by.set(s.file_path, arr);
-      });
-
-      const groups = [];
-      for (const [filePath, arr] of by.entries()) {
-        arr.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-        const lastAtIso = arr[0].created_at;
-
-        groups.push({
-          filePath,
-          fileName: filePath.split(/[/\\\\]/).pop() || filePath,
-          relPath: filePath,
-          lastAtIso,
-          count: arr.length,
-          versions: arr.map(v => ({
-            id: v.id,
-            time: fmt(v.created_at),       // ✅ per snapshot
-            created_at: v.created_at,
-          }))
-        });
-      }
-
-      groups.sort((a,b) => new Date(b.lastAtIso) - new Date(a.lastAtIso));
-      return groups;
-    }
-
-    function computeAndRender() {
-      const { start, end } = computeRangeFilter();
-      const snapsInRange = rawSnaps.filter(s => {
-        const t = new Date(s.created_at);
-        return t >= start && t < end;
-      });
-
-      fileGroups = groupByFile(snapsInRange);
-
-      const q = search.value.trim().toLowerCase();
-      filtered = !q ? fileGroups : fileGroups.filter(g =>
-        (g.fileName || "").toLowerCase().includes(q) ||
-        (g.relPath || "").toLowerCase().includes(q)
-      );
-
-      if (mode === "month" && !selectedDay) {
-        leftTitle.textContent = "Days (last 31)";
-        leftSub.textContent = "";
-        renderDays();
-        rightSub.textContent = selectedDay ? selectedDay : "Pick a day";
-        rightList.innerHTML = '<div class="empty">Select a day to view files and snapshots.</div>';
-        return;
-      }
-
-      leftTitle.textContent = "Files";
-      leftSub.textContent = filtered.length ? \`\${filtered.length} files\` : "";
-      renderFiles();
-      renderSnapshots();
-    }
-
-    function dotClass(count) {
-      if (count <= 0) return "dot0";
-      if (count <= 5) return "dot1";
-      if (count <= 15) return "dot2";
-      return "dot3";
-    }
-
-    function renderDays() {
-      leftList.innerHTML = "";
-      if (!days.length) {
-        leftList.innerHTML = '<div class="empty">No data yet.</div>';
-        return;
-      }
-
-      days.forEach((d) => {
-        const el = document.createElement("div");
-        el.className = "item";
-        el.innerHTML = \`
-          <div class="row">
-            <div><span class="dayDot \${dotClass(d.count)}"></span><b>\${d.label}</b></div>
-            <div class="pill">\${d.count}</div>
-          </div>
-          <div class="path">\${d.isoDate}</div>
-        \`;
-        el.onclick = () => {
-          selectedDay = d.isoDate;
-          computeAndRender();
-        };
-        leftList.appendChild(el);
-      });
-    }
-
-    function renderFiles() {
-      leftList.innerHTML = "";
-
-      if (!filtered.length) {
-        leftList.innerHTML = '<div class="empty">No activity in this range.</div>';
-        rightList.innerHTML = '<div class="empty">No snapshots to show.</div>';
-        rightSub.textContent = "";
-        return;
-      }
-
-      filtered.forEach((f, idx) => {
-        const el = document.createElement("div");
-        el.className = "item" + (idx === selectedFileIndex ? " active" : "");
-        el.innerHTML = \`
-          <div class="row">
-            <div class="fileName">📄 \${f.fileName}</div>
-            <div class="pill">\${f.count}</div>
-          </div>
-          <div class="path">\${f.relPath}</div>
-        \`;
-        el.onclick = () => { selectedFileIndex = idx; renderFiles(); renderSnapshots(); };
-        leftList.appendChild(el);
-      });
-    }
-
-    function renderSnapshots() {
-      rightList.innerHTML = "";
-      if (!filtered.length) return;
-
-      const sel = filtered[selectedFileIndex] || filtered[0];
-      if (!sel) return;
-
-      rightSub.textContent = sel.relPath;
-
-      sel.versions.forEach(v => {
-        const el = document.createElement("div");
-        el.className = "item";
-        el.onclick = () => vscode.postMessage({ type: "openDiff", snapshotId: v.id, filePath: sel.filePath });
-
-        el.innerHTML = \`
-          <div class="row">
-            <div class="time"><b>\${v.time}</b></div>
-            <div class="actions">
-              <button class="mini" data-action="diff">Diff</button>
-              <button class="mini danger" data-action="revert">Revert</button>
-            </div>
-          </div>
-          <div class="path">Snapshot #\${v.id}</div>
-        \`;
-
-        el.querySelector('[data-action="diff"]').onclick = (e) => {
-          e.stopPropagation();
-          vscode.postMessage({ type: "openDiff", snapshotId: v.id, filePath: sel.filePath });
-        };
-
-        el.querySelector('[data-action="revert"]').onclick = (e) => {
-          e.stopPropagation();
-          vscode.postMessage({ type: "revert", snapshotId: v.id, filePath: sel.filePath });
-        };
-
-        rightList.appendChild(el);
-      });
-    }
-
-    vscode.postMessage({ type: "refresh" });
-  </script>
+  vscode.postMessage({ type:"refresh" });
+</script>
 </body>
 </html>`;
   }

@@ -3,7 +3,7 @@
   "name": "devtracker",
   "displayName": "DevTracker (Beta)",
   "description": "Local-first developer activity tracker with diffs, history & revert. Beta version.",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "publisher": "GenomorphPvtLtd",
   "preview": true,
   "engines": {
@@ -13,39 +13,55 @@
     "type": "git",
     "url": "https://github.com/Agent1092/devTracker.git"
   },
-  
   "activationEvents": [
-  "onStartupFinished",
-  "onView:devtracker.home",
-  "onCommand:devtracker.showLocalSummary",
-  "onCommand:devtracker.openHistoryPanel",
-  "onCommand:devtracker.openRecentDiff",
-  "onCommand:devtracker.reportIssue"
-]
-,
+    "onStartupFinished",
+    "onView:devtracker.home",
+    "onCommand:devtracker.showLocalSummary",
+    "onCommand:devtracker.openHistoryPanel",
+    "onCommand:devtracker.openRecentDiff",
+    "onCommand:devtracker.reportIssue"
+  ],
   "main": "./out/extension.js",
   "contributes": {
-
-    
-   "viewsContainers": {
-    "activitybar": [
-      {
-        "id": "devtracker",
-        "title": "DevTracker",
-        "icon": "resources/activitybar.png"
+    "configuration": {
+      "title": "DevTracker",
+      "properties": {
+        "devtracker.notifications.daily": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a daily popup on VS Code startup with yesterday’s work summary."
+        },
+        "devtracker.notifications.startup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a popup on VS Code startup with your last session summary."
+        },
+        "devtracker.notifications.weekly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a weekly popup on VS Code startup every Monday with last week stats."
+        }
       }
-    ]
-  },
-  "views": {
-    "devtracker": [
-    {
-      "type": "webview",
-      "id": "devtracker.home",
-      "name": "DevTracker",
-      "icon": "resources/activitybar.png"
-    }
-  ]
-  },
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devtracker",
+          "title": "DevTracker",
+          "icon": "resources/activitybar.png"
+        }
+      ]
+    },
+    "views": {
+      "devtracker": [
+        {
+          "type": "webview",
+          "id": "devtracker.home",
+          "name": "DevTracker",
+          "icon": "resources/activitybar.png"
+        }
+      ]
+    },
     "keybindings": [
       {
         "command": "devtracker.openHistoryPanel",
@@ -78,6 +94,10 @@
       {
         "command": "devtracker.reportIssue",
         "title": "DevTracker: Report Issue / Feedback"
+      },
+      {
+        "command": "devtracker.bulkRevertWizard",
+        "title": "DevTracker: Bulk Revert (Folder)"
       }
     ]
   },

@@ -38,6 +38,10 @@ async function parseJson<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+function urlForRead(path: string) {
+  return `${BACKEND_URL}${path}`;
+}
+
 export async function pingBackend(): Promise<boolean> {
   const res = await fetch(`${BACKEND_URL}/system/health`);
   if (!res.ok) throw new Error("Backend not reachable");
@@ -73,6 +77,21 @@ export async function getLatestSnapshots(
   const res = await fetch(url.toString());
   return parseJson<SnapshotSummary[]>(res);
 }
+
+export async function getLocalSummaryNew(isoDate: string): Promise<any> {
+  // Example: GET /summary/day?date=YYYY-MM-DD
+  const res = await fetch(urlForRead(`/summary/day?date=${encodeURIComponent(isoDate)}`));
+  if (!res.ok) throw new Error(`Failed summary ${res.status}`);
+  return res.json();
+}
+
+export async function getRangeSummary(fromIso: string, toIso: string): Promise<any> {
+  const qs = new URLSearchParams({ from: fromIso, to: toIso });
+  const res = await fetch(urlForRead(`/summary/range?${qs.toString()}`));
+  if (!res.ok) throw new Error(`Failed range summary ${res.status}`);
+  return res.json();
+}
+
 
 export async function getLocalSummary(
   installationId: string,

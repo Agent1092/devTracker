@@ -11,17 +11,27 @@ import {
 } from "./apiClient";
 import { registerSnapshotProvider } from "./snapshotProvider";
 import { HistoryPanel } from "./historyPanel";
+import { runStartupNotifications } from "./notifications";
+import { markSessionStart, markSessionEnd } from "./session"; // ✅ NEW
 
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import * as path from "path";
 import * as net from "net";
 import * as fs from "fs";
+import { runBulkRevertWizard } from "./bulkRevert";
 
 let serverProc: ChildProcessWithoutNullStreams | null = null;
 let backendUrl: string | null = null;
 
 let installationId: string;
 const changeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+let statusItem: vscode.StatusBarItem | null = null;
+let sessionSnapshotCount = 0;
+
+
+let _ctx: vscode.ExtensionContext | null = null; // ✅ move up so activate can set it
+
 function showWhatsNew(context: vscode.ExtensionContext) {
   const panel = vscode.window.createWebviewPanel(
     "devtracker.whatsNew",
@@ -112,8 +122,6 @@ class DevTrackerHomeView implements vscode.WebviewViewProvider {
     });
   }
 
-
-  
   private getHtml(webview: vscode.Webview) {
     const version = this.context.extension.packageJSON.version;
 
@@ -312,7 +320,8 @@ async function startEmbeddedBackend(
   const port = await getFreePort();
 
   ensureDir(context.globalStorageUri.fsPath);
-  const dbPath = path.join(context.globalStorageUri.fsPath, "devtracker.db");
+  const dbPath = path.join(context.globalStorageUri.fsPath, "devtracker_free.db");
+
 
   const serverEntry = context.asAbsolutePath(
     path.join("out", "server", "cli.js")
@@ -365,18 +374,78 @@ function registerStatusBar(context: vscode.ExtensionContext) {
     vscode.StatusBarAlignment.Left,
     100
   );
+  item.command = "devtracker.openHistoryPanel";
   item.text = "$(history) DevTracker";
   item.tooltip = "Open DevTracker History";
-  item.command = "devtracker.openHistoryPanel";
   item.show();
   context.subscriptions.push(item);
+
+  statusItem = item;
+  updateStatusBar();
 }
 
+function updateStatusBar() {
+  if (!statusItem) return;
+  if (sessionSnapshotCount > 0) {
+    statusItem.text = `$(history) DevTracker +${sessionSnapshotCount}`;
+    statusItem.tooltip = `${sessionSnapshotCount} snapshot(s) recorded this session. Click to open history.`;
+  } else {
+    statusItem.text = "$(history) DevTracker";
+    statusItem.tooltip = "Open DevTracker History";
+  }
+}
+
+
 export async function activate(context: vscode.ExtensionContext) {
+  _ctx = context;              // ✅ NEW: makes deactivate work
+  markSessionStart(context);   // ✅ NEW: start session tracking
+
   installationId = getOrCreateInstallationId(context);
 
   registerSnapshotProvider(context);
 
+
+//   context.subscriptions.push(
+//   vscode.window.onDidChangeWindowState((e) => {
+//     // if window becomes inactive, treat as session end checkpoint
+//     if (!e.focused) markSessionEnd(context);
+//   })
+// );
+
+context.subscriptions.push(
+  vscode.workspace.onDidCloseTextDocument(() => {
+    // lightweight checkpoint (optional)
+  })
+);
+
+context.subscriptions.push(
+  vscode.env.onDidChangeTelemetryEnabled(() => {
+    // no-op, just ensures env events don't break
+  })
+);
+
+_ctx = context;
+markSessionStart(context);
+
+// ✅ End session checkpoint when VS Code window loses focus
+context.subscriptions.push(
+  vscode.window.onDidChangeWindowState((e) => {
+    if (!e.focused) {
+      markSessionEnd(context);
+      // Immediately start a fresh session when user comes back
+    } else {
+      markSessionStart(context);
+    }
+  })
+);
+
+// ✅ (optional) also checkpoint end when VS Code is closing docs/workspace
+context.subscriptions.push(
+  vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    markSessionEnd(context);
+    markSessionStart(context);
+  })
+);
   // Start embedded backend
   try {
     backendUrl = await startEmbeddedBackend(context);
@@ -389,6 +458,9 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   registerStatusBar(context);
+  sessionSnapshotCount = 0;
+updateStatusBar();
+
 
   // ✅ Webview View provider for Activity Bar
   context.subscriptions.push(
@@ -398,31 +470,41 @@ export async function activate(context: vscode.ExtensionContext) {
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
-
-  const currentVersion = context.extension.packageJSON.version;
-const lastVersion = context.globalState.get<string>("devtracker.lastVersion");
-
-if (lastVersion !== currentVersion) {
-  vscode.window
-    .showInformationMessage(
-      `DevTracker updated to v${currentVersion}`,
-      "What's New"
-    )
-    .then((choice) => {
-      if (choice === "What's New") {
-        showWhatsNew(context);
-      }
-    });
-
-  context.globalState.update("devtracker.lastVersion", currentVersion);
-}
-
-context.subscriptions.push(
-  vscode.commands.registerCommand("devtracker.whatsNew", () => {
-    showWhatsNew(context);
+  context.subscriptions.push(
+  vscode.commands.registerCommand("devtracker.bulkRevertWizard", async () => {
+    await runBulkRevertWizard({ ctx: context, installationId });
   })
 );
 
+
+  setTimeout(() => {
+    runStartupNotifications(context, installationId);
+
+  }, 1200);
+
+  const currentVersion = context.extension.packageJSON.version;
+  const lastVersion = context.globalState.get<string>("devtracker.lastVersion");
+
+  if (lastVersion !== currentVersion) {
+    vscode.window
+      .showInformationMessage(
+        `DevTracker updated to v${currentVersion}`,
+        "What's New"
+      )
+      .then((choice) => {
+        if (choice === "What's New") {
+          showWhatsNew(context);
+        }
+      });
+
+    context.globalState.update("devtracker.lastVersion", currentVersion);
+  }
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("devtracker.whatsNew", () => {
+      showWhatsNew(context);
+    })
+  );
 
   // Listener: capture changes (debounced)
   const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -601,9 +683,13 @@ context.subscriptions.push(
     })
   );
 }
+export function getCurrentSessionStart(ctx: vscode.ExtensionContext): string | null {
+  return ctx.globalState.get<string>("devtracker.session.currentStart") ?? null;
+}
 
 export function deactivate() {
   try {
+    if (_ctx) markSessionEnd(_ctx); // ✅ FIXED
     serverProc?.kill();
   } catch {
     // ignore
@@ -619,6 +705,8 @@ function scheduleSnapshotSend(document: vscode.TextDocument) {
 
   const timeout = setTimeout(() => {
     changeTimers.delete(filePath);
+    sessionSnapshotCount++;
+updateStatusBar();
 
     postFileChange({
       installation_id: installationId,

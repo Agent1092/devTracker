@@ -6,6 +6,8 @@ exports.pingBackend = pingBackend;
 exports.postFileChange = postFileChange;
 exports.getSnapshot = getSnapshot;
 exports.getLatestSnapshots = getLatestSnapshots;
+exports.getLocalSummaryNew = getLocalSummaryNew;
+exports.getRangeSummary = getRangeSummary;
 exports.getLocalSummary = getLocalSummary;
 let BACKEND_URL = "http://127.0.0.1:8000"; // default/fallback
 function setBackendUrl(url) {
@@ -17,6 +19,9 @@ async function parseJson(res) {
         throw new Error(`Request failed (${res.status}) ${txt}`);
     }
     return (await res.json());
+}
+function urlForRead(path) {
+    return `${BACKEND_URL}${path}`;
 }
 async function pingBackend() {
     const res = await fetch(`${BACKEND_URL}/system/health`);
@@ -45,6 +50,20 @@ async function getLatestSnapshots(installationId, limit = 200) {
     url.searchParams.set("limit", String(limit));
     const res = await fetch(url.toString());
     return parseJson(res);
+}
+async function getLocalSummaryNew(isoDate) {
+    // Example: GET /summary/day?date=YYYY-MM-DD
+    const res = await fetch(urlForRead(`/summary/day?date=${encodeURIComponent(isoDate)}`));
+    if (!res.ok)
+        throw new Error(`Failed summary ${res.status}`);
+    return res.json();
+}
+async function getRangeSummary(fromIso, toIso) {
+    const qs = new URLSearchParams({ from: fromIso, to: toIso });
+    const res = await fetch(urlForRead(`/summary/range?${qs.toString()}`));
+    if (!res.ok)
+        throw new Error(`Failed range summary ${res.status}`);
+    return res.json();
 }
 async function getLocalSummary(installationId, date) {
     const res = await fetch(`${BACKEND_URL}/summary/local`, {

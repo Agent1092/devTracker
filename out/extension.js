@@ -34,20 +34,27 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
+exports.getCurrentSessionStart = getCurrentSessionStart;
 exports.deactivate = deactivate;
 // src/extension.ts
 const vscode = __importStar(require("vscode"));
 const apiClient_1 = require("./apiClient");
 const snapshotProvider_1 = require("./snapshotProvider");
 const historyPanel_1 = require("./historyPanel");
+const notifications_1 = require("./notifications");
+const session_1 = require("./session"); // ✅ NEW
 const child_process_1 = require("child_process");
 const path = __importStar(require("path"));
 const net = __importStar(require("net"));
 const fs = __importStar(require("fs"));
+const bulkRevert_1 = require("./bulkRevert");
 let serverProc = null;
 let backendUrl = null;
 let installationId;
 const changeTimers = new Map();
+let statusItem = null;
+let sessionSnapshotCount = 0;
+let _ctx = null; // ✅ move up so activate can set it
 function showWhatsNew(context) {
     const panel = vscode.window.createWebviewPanel("devtracker.whatsNew", "What's New — DevTracker", vscode.ViewColumn.One, { enableScripts: false });
     const version = context.extension.packageJSON.version;
@@ -310,7 +317,7 @@ function getOrCreateInstallationId(context) {
 async function startEmbeddedBackend(context) {
     const port = await getFreePort();
     ensureDir(context.globalStorageUri.fsPath);
-    const dbPath = path.join(context.globalStorageUri.fsPath, "devtracker.db");
+    const dbPath = path.join(context.globalStorageUri.fsPath, "devtracker_free.db");
     const serverEntry = context.asAbsolutePath(path.join("out", "server", "cli.js"));
     const proc = (0, child_process_1.spawn)(process.execPath, [serverEntry], {
         env: {
@@ -346,15 +353,60 @@ async function waitForBackendReady(timeoutMs = 7000) {
  */
 function registerStatusBar(context) {
     const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    item.command = "devtracker.openHistoryPanel";
     item.text = "$(history) DevTracker";
     item.tooltip = "Open DevTracker History";
-    item.command = "devtracker.openHistoryPanel";
     item.show();
     context.subscriptions.push(item);
+    statusItem = item;
+    updateStatusBar();
+}
+function updateStatusBar() {
+    if (!statusItem)
+        return;
+    if (sessionSnapshotCount > 0) {
+        statusItem.text = `$(history) DevTracker +${sessionSnapshotCount}`;
+        statusItem.tooltip = `${sessionSnapshotCount} snapshot(s) recorded this session. Click to open history.`;
+    }
+    else {
+        statusItem.text = "$(history) DevTracker";
+        statusItem.tooltip = "Open DevTracker History";
+    }
 }
 async function activate(context) {
+    _ctx = context; // ✅ NEW: makes deactivate work
+    (0, session_1.markSessionStart)(context); // ✅ NEW: start session tracking
     installationId = getOrCreateInstallationId(context);
     (0, snapshotProvider_1.registerSnapshotProvider)(context);
+    //   context.subscriptions.push(
+    //   vscode.window.onDidChangeWindowState((e) => {
+    //     // if window becomes inactive, treat as session end checkpoint
+    //     if (!e.focused) markSessionEnd(context);
+    //   })
+    // );
+    context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(() => {
+        // lightweight checkpoint (optional)
+    }));
+    context.subscriptions.push(vscode.env.onDidChangeTelemetryEnabled(() => {
+        // no-op, just ensures env events don't break
+    }));
+    _ctx = context;
+    (0, session_1.markSessionStart)(context);
+    // ✅ End session checkpoint when VS Code window loses focus
+    context.subscriptions.push(vscode.window.onDidChangeWindowState((e) => {
+        if (!e.focused) {
+            (0, session_1.markSessionEnd)(context);
+            // Immediately start a fresh session when user comes back
+        }
+        else {
+            (0, session_1.markSessionStart)(context);
+        }
+    }));
+    // ✅ (optional) also checkpoint end when VS Code is closing docs/workspace
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        (0, session_1.markSessionEnd)(context);
+        (0, session_1.markSessionStart)(context);
+    }));
     // Start embedded backend
     try {
         backendUrl = await startEmbeddedBackend(context);
@@ -365,8 +417,16 @@ async function activate(context) {
         vscode.window.showWarningMessage(`DevTracker: Could not start embedded backend. (${err?.message ?? err})`);
     }
     registerStatusBar(context);
+    sessionSnapshotCount = 0;
+    updateStatusBar();
     // ✅ Webview View provider for Activity Bar
     context.subscriptions.push(vscode.window.registerWebviewViewProvider("devtracker.home", new DevTrackerHomeView(context, installationId), { webviewOptions: { retainContextWhenHidden: true } }));
+    context.subscriptions.push(vscode.commands.registerCommand("devtracker.bulkRevertWizard", async () => {
+        await (0, bulkRevert_1.runBulkRevertWizard)({ ctx: context, installationId });
+    }));
+    setTimeout(() => {
+        (0, notifications_1.runStartupNotifications)(context, installationId);
+    }, 1200);
     const currentVersion = context.extension.packageJSON.version;
     const lastVersion = context.globalState.get("devtracker.lastVersion");
     if (lastVersion !== currentVersion) {
@@ -502,8 +562,13 @@ async function activate(context) {
         vscode.env.openExternal(vscode.Uri.parse(url));
     }));
 }
+function getCurrentSessionStart(ctx) {
+    return ctx.globalState.get("devtracker.session.currentStart") ?? null;
+}
 function deactivate() {
     try {
+        if (_ctx)
+            (0, session_1.markSessionEnd)(_ctx); // ✅ FIXED
         serverProc?.kill();
     }
     catch {
@@ -519,6 +584,8 @@ function scheduleSnapshotSend(document) {
         clearTimeout(existing);
     const timeout = setTimeout(() => {
         changeTimers.delete(filePath);
+        sessionSnapshotCount++;
+        updateStatusBar();
         (0, apiClient_1.postFileChange)({
             installation_id: installationId,
             file_path: filePath,

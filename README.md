@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/logo.png" width="96" />
+  <img src="logo.png" width="96" />
 </p>
 
 <h1 align="center">DevTracker</h1>
@@ -46,12 +46,38 @@ No data leaves your system.
 
 > Team and business workspace features will be introduced in future versions.
 
+## Screenshots
+
+### Activity Bar Home
+![Home](./screenshots/sidebar.png)
+
+### Activity Bar Home
+![History](./screenshots/history.png)
+
+### Diff Viewer
+![Diff](./screenshots/quick%20latest%20diff.png)
+
+### Local Summary
+![Summary](./screenshots/local%20summary.png)
+
 ---
 
 ## 📦 Installation
 
 ### VS Code Marketplace
 🔗 *(Link will be added after marketplace approval)*
+
+## Who is this for?
+- Individual developers
+- Privacy-conscious engineers
+- Offline / low-distraction workflows
+- People who want daily/weekly work summaries
+
+## What DevTracker is NOT
+- ❌ Employee monitoring
+- ❌ Time tracking spyware
+- ❌ Cloud-first analytics
+
 
 ### From source
 ```bash
