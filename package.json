@@ -3,7 +3,7 @@
   "name": "devtracker",
   "displayName": "DevTracker (Beta)",
   "description": "Local-first developer activity tracker with diffs, history & revert. Beta version.",
-  "version": "0.9.5",
+  "version": "0.9.7",
   "publisher": "GenomorphPvtLtd",
   "preview": true,
   "engines": {
@@ -79,6 +79,14 @@
         "command": "devtracker.showLocalSummary",
         "title": "DevTracker: Show Local Summary"
       },
+      {
+  "command": "devtracker.exportWeeklyReflection",
+  "title": "DevTracker: Export Weekly Reflection"
+},
+{
+  "command": "devtracker.exportMonthlyReflection",
+  "title": "DevTracker: Export Monthly Reflection"
+},
       {
         "command": "devtracker.whatsNew",
         "title": "DevTracker: What's New"

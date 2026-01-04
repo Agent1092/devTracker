@@ -47,7 +47,7 @@ async function runStartupNotifications(ctx, installationId) {
         return;
     const last = (0, session_1.getLastSessionWindow)(ctx);
     if (!last)
-        return; // ✅ silently skip, no popup, no warning
+        return;
     const lastShown = ctx.globalState.get(KEY_LAST_SHOWN_SESSION);
     if (lastShown === last.endIso)
         return;
@@ -77,14 +77,10 @@ async function runStartupNotifications(ctx, installationId) {
     const msg = `DevTracker • Last session: ${inWindow.length} snapshots across ${counts.size} files.` +
         (top ? ` Top: ${top}` : "");
     const OPEN = "Open DevTracker";
-    const REVERT = "Bulk Revert…";
     const DISABLE = "Disable popups";
-    const picked = await vscode.window.showInformationMessage(msg, OPEN, REVERT, DISABLE);
+    const picked = await vscode.window.showInformationMessage(msg, OPEN, DISABLE);
     if (picked === OPEN) {
         await vscode.commands.executeCommand("devtracker.openHistoryPanel");
-    }
-    else if (picked === REVERT) {
-        await vscode.commands.executeCommand("devtracker.bulkRevertWizard");
     }
     else if (picked === DISABLE) {
         await vscode.workspace
