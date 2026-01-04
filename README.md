@@ -197,7 +197,7 @@ git clone https://github.com/Agent1092/devTracker.git
 cd vscode-extension
 npm install
 npm run compile
-
+```
 ---
 
 ## ⭐ If this saves you even 10 minutes…
