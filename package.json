@@ -1,31 +1,98 @@
 {
   "icon": "logo.png",
   "name": "devtracker",
-  "displayName": "DevTracker (Beta)",
-  "description": "Local-first developer activity tracker with diffs, history & revert. Beta version.",
-  "version": "0.9.7",
+  "displayName": "DevTracker",
+  "description": "Local-first developer activity tracker for VS Code — diffs, history, revert, work logs & offline summaries.",
+  "version": "1.0.4",
   "publisher": "GenomorphPvtLtd",
   "preview": true,
   "engines": {
     "vscode": "^1.80.0"
   },
+"categories": ["SCM Providers", "Visualization", "Other"],
+  "keywords": [
+    "devtracker",
+    "developer activity",
+    "activity tracker",
+    "coding activity",
+    "work log",
+    "worklog",
+    "what did i work on",
+    "daily report",
+    "weekly report",
+    "monthly report",
+    "work report",
+    "timesheet", "timesheets",
+    "auto timesheet",
+    "engineering productivity",
+    "productivity",
+    "diff",
+    "diffs",
+    "code diff",
+    "file diff",
+    "change tracking",
+    "track changes",
+    "code history",
+    "file history",
+    "local history",
+    "revert",
+    "undo changes",
+    "restore file",
+    "source control",
+    "version control",
+    "scm",
+    "tracker"
+  ],
+  "homepage": "https://devtracker.in",
+  "bugs": {
+    "url": "https://github.com/Agent1092/devTracker/issues"
+  },
+  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/Agent1092/devTracker.git"
   },
   "activationEvents": [
     "onStartupFinished",
+    "onUri",
     "onView:devtracker.home",
+    "onView:devtracker.proHome",
     "onCommand:devtracker.showLocalSummary",
     "onCommand:devtracker.openHistoryPanel",
     "onCommand:devtracker.openRecentDiff",
-    "onCommand:devtracker.reportIssue"
+    "onCommand:devtracker.reportIssue",
+    "onCommand:devtracker.exportWeeklyReflection",
+    "onCommand:devtracker.exportMonthlyReflection",
+    "onCommand:devtracker.setOpenAIKey",
+    "onCommand:devtracker.pro.generateWeekly",
+    "onCommand:devtracker.pro.previewWeekly",
+    "onCommand:devtracker.pro.generateMonthly",
+    "onCommand:devtracker.pro.login",
+    "onCommand:devtracker.pro.logout",
+    "onCommand:devtracker.pro.refreshEntitlement",
+    "onCommand:devtracker.pro.generateDaily",
+    "onCommand:devtracker.installPdfEngine"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
       "title": "DevTracker",
       "properties": {
+        "devtracker.cloud.supabaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase project URL for Pro login (leave empty to use built-in Early Access defaults)."
+        },
+        "devtracker.cloud.supabaseAnonKey": {
+          "type": "string",
+          "default": "",
+          "description": "Supabase anon key for Pro login (leave empty to use built-in Early Access defaults)."
+        },
+        "devtracker.cloud.supabaseFunctionName": {
+          "type": "string",
+          "default": "devtracker-cloud-summary",
+          "description": "Supabase Edge Function name that handles cloud summaries."
+        },
         "devtracker.notifications.daily": {
           "type": "boolean",
           "default": true,
@@ -40,6 +107,60 @@
           "type": "boolean",
           "default": true,
           "description": "Show a weekly popup on VS Code startup every Monday with last week stats."
+        },
+        "devtracker.proDevUnlocked": {
+          "type": "boolean",
+          "default": false,
+          "description": "Developer-only toggle to unlock Pro UI locally (temporary)."
+        },
+        "devtracker.uiTheme": {
+          "type": "string",
+          "default": "dark",
+          "enum": ["dark", "retro"],
+          "description": "DevTracker UI theme. 'retro' also applies workbench color customizations."
+        },
+        "devtracker.cloud.exclude": {
+          "type": "array",
+          "default": [
+            "**/.git/**",
+            "**/node_modules/**",
+            "**/dist/**",
+            "**/out/**",
+            "**/.next/**",
+            "**/build/**",
+            "**/target/**",
+            "**/venv/**",
+            "**/__pycache__/**",
+            "**/.DS_Store",
+            "**/*.zip",
+            "**/*.png",
+            "**/*.jpg",
+            "**/*.jpeg",
+            "**/*.webp",
+            "**/*.gif",
+            "**/*.mp4",
+            "**/*.mov",
+            "**/*.pdf",
+            "**/.env",
+            "**/.env.*"
+          ],
+          "description": "Glob patterns excluded from cloud uploads."
+        },
+        "devtracker.pro.summaryMode": {
+          "type": "string",
+          "default": "local",
+          "enum": ["local", "cloud"],
+          "description": "Where Pro summaries are generated. Local uses offline summarizer. Cloud uses AI."
+        },
+        "devtracker.pro.cloudConsent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the user has accepted sending code to cloud for AI summaries."
+        },
+        "devtracker.pro.cloudUploadCodebase": {
+          "type": "boolean",
+          "default": true,
+          "description": "If enabled, DevTracker sends selected code files as context to the AI provider for better summaries."
         }
       }
     },
@@ -58,6 +179,12 @@
           "type": "webview",
           "id": "devtracker.home",
           "name": "DevTracker",
+          "icon": "resources/activitybar.png"
+        },
+        {
+          "type": "webview",
+          "id": "devtracker.proHome",
+          "name": "Pro",
           "icon": "resources/activitybar.png"
         }
       ]
@@ -80,13 +207,25 @@
         "title": "DevTracker: Show Local Summary"
       },
       {
-  "command": "devtracker.exportWeeklyReflection",
-  "title": "DevTracker: Export Weekly Reflection"
-},
-{
-  "command": "devtracker.exportMonthlyReflection",
-  "title": "DevTracker: Export Monthly Reflection"
-},
+        "command": "devtracker.pro.login",
+        "title": "DevTracker Pro: Login"
+      },
+      {
+        "command": "devtracker.pro.logout",
+        "title": "DevTracker Pro: Logout"
+      },
+      {
+        "command": "devtracker.pro.refreshEntitlement",
+        "title": "DevTracker Pro: Refresh Entitlement"
+      },
+      {
+        "command": "devtracker.exportWeeklyReflection",
+        "title": "DevTracker: Export Weekly Reflection"
+      },
+      {
+        "command": "devtracker.exportMonthlyReflection",
+        "title": "DevTracker: Export Monthly Reflection"
+      },
       {
         "command": "devtracker.whatsNew",
         "title": "DevTracker: What's New"
@@ -104,26 +243,65 @@
         "title": "DevTracker: Report Issue / Feedback"
       },
       {
+        "command": "devtracker.setOpenAIKey",
+        "title": "DevTracker: Set OpenAI API Key"
+      },
+      {
         "command": "devtracker.bulkRevertWizard",
         "title": "DevTracker: Bulk Revert (Folder)"
+      },
+      {
+        "command": "devtracker.pro.generateWeekly",
+        "title": "DevTracker Pro: Generate Weekly Narrative"
+      },
+      {
+        "command": "devtracker.pro.previewWeekly",
+        "title": "DevTracker Pro: Preview Weekly Narrative"
+      },
+      {
+        "command": "devtracker.pro.generateMonthly",
+        "title": "DevTracker Pro: Generate Monthly Narrative"
+      },
+      {
+        "command": "devtracker.toggleTheme",
+        "title": "DevTracker: Toggle Theme (Retro/Default)"
+      },
+      {
+        "command": "devtracker.installPdfEngine",
+        "title": "DevTracker: Install PDF Engine (Chromium)"
+      },
+      {
+        "command": "devtracker.pro.generateDaily",
+        "title": "DevTracker Pro: Generate Daily Narrative"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "clean": "rm -rf out",
+    "vscode:prepublish": "npm run build",
     "compile": "tsc -p ./",
+    "build": "npm run clean && npm run compile",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
+    "@types/react": "^18.3.12",
     "@types/vscode": "^1.80.0",
     "typescript": "^5.0.0",
     "vsce": "^2.15.0"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.3.2",
+    "@supabase/supabase-js": "^2.90.1",
     "body-parser": "^2.2.1",
+    "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "openai": "^6.16.0",
+    "pdf-lib": "^1.17.1",
+    "pdfkit": "^0.17.2",
+    "playwright": "^1.58.0",
     "sql.js": "^1.13.0"
   }
 }

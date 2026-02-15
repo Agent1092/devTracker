@@ -1,76 +1,85 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Agent1092/devTracker/main/logo.png" width="96" />
+  <img src="https://raw.githubusercontent.com/Agent1092/devTracker/main/logo.png" width="96" alt="DevTracker logo" />
 </p>
 
 <h1 align="center">DevTracker</h1>
-<p align="center"><i>A local-first developer activity tracker for VS Code</i></p>
+<p align="center"><i>VS Code Activity Tracker • Local Work Log • Diffs, History & Revert • Offline & Privacy-first</i></p>
 
 <p align="center">
   <a href="https://github.com/Agent1092/devTracker/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Agent1092/devTracker?style=for-the-badge"></a>
   <a href="https://github.com/Agent1092/devTracker/issues"><img alt="Issues" src="https://img.shields.io/github/issues/Agent1092/devTracker?style=for-the-badge"></a>
-  <a href="https://github.com/Agent1092/devTracker/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Agent1092/devTracker/ci.yml?style=for-the-badge"></a>
+  <a href="https://github.com/Agent1092/devTracker/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/Agent1092/devTracker/ci.yml?branch=main&style=for-the-badge"></a>
   <a href="https://github.com/Agent1092/devTracker/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/Agent1092/devTracker?style=for-the-badge"></a>
 </p>
+
 
 <p align="center">
   <b>DevTracker answers one question:</b><br/>
   <i>“What did I actually work on?”</i><br/>
-  <sub>Local-first. Offline. No cloud. No spyware.</sub>
+  <sub>Local-first. Offline. No spyware. Optional Pro cloud summaries only with consent.</sub>
+</p>
+
+<p align="center">
+  <b>Search keywords:</b>
+  VS Code activity tracker, developer activity, work log, timesheet, code history, local history, diff, revert, offline, privacy
 </p>
 
 ---
 
-## 🚀 DevTracker (Beta)
+## 🚀 DevTracker — VS Code Activity Tracker (Local-first)
 
-DevTracker is a **local-first VS Code extension** that quietly records file snapshots (locally) and surfaces **useful work insights** when you need them.
+DevTracker is a **local-first VS Code extension** that records **file snapshots locally** and helps you generate a **work log** using:
+- **Diffs** (what changed)
+- **Local history** (when you changed it)
+- **Revert tools** (undo confidently)
+- **Daily / Weekly / Monthly reflections** (what you worked on)
+- **Exports** (PDF / MD / TXT / XLSX)
 
-It’s built for individual developers who want:
-- ✅ context after a break
-- ✅ proof of progress (without time tracking)
-- ✅ quick diffs + undo confidence
-- ✅ zero cloud / zero remote upload
+✅ Designed for individual developers who want clarity without surveillance.  
+✅ Works offline. Your data stays on your machine.
 
 ---
 
 ## Why DevTracker?
 
-Developers constantly ask:
+Developers keep asking:
 - *“What did I work on yesterday?”*
-- *“Which file did I touch the most this week?”*
+- *“Which files did I touch most this week?”*
 - *“What changed before I broke this?”*
+- *“How do I write a weekly update / work report / timesheet?”*
 
-DevTracker gives you answers without:
-- ❌ cloud sync
+DevTracker gives you answers **without**:
+- ❌ cloud sync by default
 - ❌ remote monitoring agents
 - ❌ team surveillance dashboards
 - ❌ heavy overhead
 
-**Your data stays on your machine. Always.**
+**Your snapshots are local. Always.**
 
 ---
 
-## ✨ Features (v0.9.8 — Beta)
+## ✨ Features
 
-### 🧠 Daily Reflection (Auto, Silent)
-- On next startup, DevTracker shows a **clean “Yesterday at a glance”** popup
+### 🧠 Daily Reflection (Auto Work Log)
+- On next startup, DevTracker shows a **“Yesterday at a glance”** popup
 - Highlights:
   - files touched
-  - intensity (quick touch vs deep work)
+  - quick touch vs deep work
   - top activity
-  - small technical insights (non-AI)
+  - local technical insights (non-AI)
 
 > Perfect for morning context. Zero effort.
 
 ---
 
-### 🗂️ Local History Panel (1 month)
-- Explore your recent work as a **collapsible folder/file tree**
+### 🗂️ Local History Panel (Snapshot Timeline)
+- Browse your recent work as a **collapsible folder/file tree**
 - Open diffs for any snapshot
 - See effort distribution quickly
 
 ---
 
-### 🔍 Instant Diff Viewer
+### 🔍 Instant Diff Viewer (VS Code Diff)
 - Compare any tracked snapshot with current file state
 - Jump through diffs inside VS Code
 
@@ -79,38 +88,49 @@ DevTracker gives you answers without:
 ### ↩️ Bulk Revert (Local-only)
 - Undo all changes from your **last session** for a folder
 - One confirmation, fully local
-- No bulk revert from Global views (safer by design)
+- Safer-by-design: bulk revert stays **local scope**
 
 ---
 
-### 📊 Local Summary (Premium-style popup)
-- Manual “Local Summary” shows a **blurred modal card**
-- Fast, skimmable, technical, and local-only
+### 📊 Local Summary (Offline)
+- Manual “Local Summary” shows a **fast skimmable** summary card
+- Technical and local-only
 
 ---
 
-### 📅 Weekly & Monthly Reflection (Global overview)
-- Reflection-style dashboards showing:
-  - total touched files + snapshots
-  - top projects/roots (collapsed list)
-  - top files across the system
-  - peak day + top filetype
+### 📅 Weekly & Monthly Reflection (Work Report)
+Reflection dashboards showing:
+- total touched files + snapshots
+- top roots/projects
+- top files across the system
+- peak day + top filetype
+- **one-click copy** for sharing status updates
 
-> Great for “what happened this week/month?” without time tracking.
+> Great for “what happened this week/month?” without time tracking spyware.
 
 ---
 
-## 🟢 Core Principles
+### 🧾 Exports: PDF (Basic + Premium), MD/TXT/XLSX
+DevTracker ships with **two PDF export modes**:
+
+- **Basic PDF (always works):** lightweight fallback export
+- **Premium PDF (charts + clean layout):** rendered via Chromium for accurate HTML/CSS dashboards
+
+✅ Premium export may require a **one-time “PDF Engine (Chromium)” install** on first use.  
+No browser is bundled inside the VSIX (keeps downloads small for Marketplace + Open VSX).
+
+---
+
+## 🟢 Core Principles (Privacy-first)
 - ✅ Local-first
 - ✅ Works offline
-- ✅ No cloud sync
-- ✅ No background VMs
+- ✅ No employee monitoring
 - ✅ No performance drama
 - ✅ Undo-friendly workflows
 
 ---
 
-## 🧠 How it works
+## 🧠 How it works (Local-first by design)
 
 DevTracker runs a **lightweight embedded local service** inside the extension.
 
@@ -118,36 +138,40 @@ DevTracker runs a **lightweight embedded local service** inside the extension.
 - Data → stored locally
 - Summaries → computed locally
 
-**Nothing is uploaded. Nothing is tracked remotely.**
+**Nothing is uploaded by default.**
 
 ---
 
-## 🧩 For GitHub nerds (the fun part)
+## 🔑 DevTracker Pro (optional AI, still privacy-first)
 
-### ✅ Works great alongside Git
-DevTracker is not Git. It’s your **personal “work memory” layer**:
+DevTracker Pro adds an optional “cloud narrative” bridge when you want AI output:
+
+- **Pro Narratives (Daily / Weekly / Monthly):** richer reports with export to MD / TXT / PDF / XLSX
+- **Summary mode toggle:** choose **Local** (offline) or **Cloud (AI)** per request
+- **Opt-in cloud summaries:** runs only after (a) GitHub login, (b) active Pro entitlement, and (c) explicit cloud consent
+- **Cloud upload filters:** respects `devtracker.cloud.exclude` to avoid sending sensitive files
+- **Supabase-backed GitHub OAuth login** with session refresh
+- **OpenAI key does NOT ship in VSIX:** stored in Supabase Edge Function secret for hosted flow
+
+**Local-first promise:** Everything runs locally by default. Cloud summaries happen only when you switch to Cloud mode and give consent.
+
+---
+
+## Plans: Free vs Pro
+
+- **Shared (Free + Pro):** local snapshot capture, daily/weekly/monthly reflections, instant diffs, bulk revert, exports, retro/dark theme
+- **Pro:** Pro Narratives + advanced exports + Local/Cloud mode toggle + consent-gated cloud summaries + Pro Home entitlement actions + Preview Weekly Narrative
+
+---
+
+## 🧩 Works great alongside Git (but it’s not Git)
+DevTracker is your **personal “work memory” layer**:
 - before commits
 - during refactors
-- during experiments
-- while testing random ideas
+- experiments / spikes
+- debugging regressions
 
-### ✅ Debug confidently
-Find the snapshot and diff *before the break happened*.
-
-### ✅ Proof-of-work (without timesheets)
-Weekly/monthly reflections help you answer:
-- “What did I touch most?”
-- “What got messy?”
-- “Where did time actually go?”
-
----
-
-## 🔮 What’s coming next
-DevTracker is still in beta. Next:
-- Improved Global history view (folder + file drilldown)
-- Smarter “focus” detection (still non-AI / local)
-- Better notification controls
-- Cloud mode (opt-in) later — **not required**
+> If Git answers “what changed in the repo”, DevTracker answers “what did I work on?”
 
 ---
 
@@ -170,23 +194,32 @@ DevTracker is still in beta. Next:
 ## 📦 Installation
 
 ### VS Code Marketplace
-🔗 *(Link will be added after marketplace approval)*
+🔗 https://marketplace.visualstudio.com/items?itemName=GenomorphPvtLtd.devtracker
+
+### Open VSX
+🔗 https://open-vsx.org/extension/GenomorphPvtLtd/devtracker
 
 ---
 
-## Who is DevTracker for?
-- Individual developers
-- Privacy-conscious engineers
-- Offline/low-distraction workflows
-- Anyone who wants **daily clarity** without overhead
+## Quick start
+1) Install DevTracker
+2) Open the **DevTracker** activity bar
+3) Work normally
+4) Use **DevTracker: Open History Panel** and **DevTracker: Open Diff From Recent Snapshot**
+5) Export weekly/monthly reflections when you need a work report
 
 ---
 
-## What DevTracker is NOT
-- ❌ Employee monitoring
-- ❌ Time-tracking spyware
-- ❌ Cloud-first analytics
-- ❌ Productivity surveillance
+## FAQ
+
+### Does DevTracker track time?
+No. DevTracker tracks **local snapshots and diffs**, not timers.
+
+### Is this employee monitoring or spyware?
+No. DevTracker is built for individual developers. No cloud dashboards, no remote tracking, no team surveillance.
+
+### Does DevTracker upload my code?
+Not by default. Only **Pro cloud summaries** may upload selected code context **after consent** and filters.
 
 ---
 
@@ -197,13 +230,3 @@ git clone https://github.com/Agent1092/devTracker.git
 cd vscode-extension
 npm install
 npm run compile
-```
----
-
-## ⭐ If this saves you even 10 minutes…
-Drop a star. It helps this project survive.
-
----
-
-## 🧪 Beta disclaimer
-Expect rapid iteration. If something feels off, open an issue with screenshots.
